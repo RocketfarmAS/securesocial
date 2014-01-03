@@ -91,6 +91,25 @@ abstract class OAuth2Provider(application: Application, jsonResponse: Boolean = 
       )
   }
 
+  def refreshAccessToken(refreshToken: String): OAuth2Info = {
+    val params = Map(
+      OAuth2Constants.ClientId -> Seq(settings.clientId),
+      OAuth2Constants.ClientSecret -> Seq(settings.clientSecret),
+      OAuth2Constants.GrantType -> Seq(OAuth2Constants.RefreshToken),
+      OAuth2Constants.RefreshToken -> Seq(refreshToken)
+    )
+
+    val call = WS.url(settings.accessTokenUrl).post(params)
+    try {
+      buildInfo(awaitResult(call))
+    } catch {
+      case e: Exception => {
+        Logger.error("[securesocial] error trying to refresh an access token for provider %s".format(id), e)
+        throw new AuthenticationException()
+      }
+    }
+  }
+
   def doAuth[A]()(implicit request: Request[A]): Either[Result, SocialUser] = {
     request.queryString.get(OAuth2Constants.Error).flatMap(_.headOption).map( error => {
       error match {
