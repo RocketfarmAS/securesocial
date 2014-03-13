@@ -1,5 +1,5 @@
 /**
- * Copyright 2012 Jorge Aliss (jaliss at gmail dot com) - twitter: @jaliss
+ * Copyright 2012-2014 Jorge Aliss (jaliss at gmail dot com) - twitter: @jaliss
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,16 +21,19 @@ import _root_.java.util.UUID
 import play.api.{Logger, Play, Application}
 import play.api.cache.Cache
 import Play.current
-import play.api.mvc.{Results, Result, Request}
+import play.api.mvc._
 import providers.utils.RoutesHelper
-import play.api.libs.ws.{Response, WS}
+import play.api.libs.ws.WS
 import scala.collection.JavaConversions._
-import scala.concurrent.TimeoutException
+import play.api.libs.ws.Response
+import scala.Some
 
 /**
  * Base class for all OAuth2 providers
  */
 abstract class OAuth2Provider(application: Application, jsonResponse: Boolean = true) extends IdentityProvider(application) {
+  private val logger = play.api.Logger("securesocial.core.OAuth2Provider")
+
   val settings = createSettings()
 
   def authMethod = AuthenticationMethod.OAuth2
@@ -72,7 +75,7 @@ abstract class OAuth2Provider(application: Application, jsonResponse: Boolean = 
       buildInfo(awaitResult(call))
     } catch {
       case e: Exception => {
-        Logger.error("[securesocial] error trying to get an access token for provider %s".format(id), e)
+        logger.error("[securesocial] error trying to get an access token for provider %s".format(id), e)
         throw new AuthenticationException()
       }
     }
@@ -80,9 +83,7 @@ abstract class OAuth2Provider(application: Application, jsonResponse: Boolean = 
 
   protected def buildInfo(response: Response): OAuth2Info = {
       val json = response.json
-      if ( Logger.isDebugEnabled ) {
-        Logger.debug("[securesocial] got json back [" + json + "]")
-      }
+      logger.debug("[securesocial] got json back [" + json + "]")
       OAuth2Info(
         (json \ OAuth2Constants.AccessToken).as[String],
         (json \ OAuth2Constants.TokenType).asOpt[String],
@@ -110,12 +111,12 @@ abstract class OAuth2Provider(application: Application, jsonResponse: Boolean = 
     }
   }
 
-  def doAuth[A]()(implicit request: Request[A]): Either[Result, SocialUser] = {
+  def doAuth()(implicit request: Request[AnyContent]): Either[SimpleResult, SocialUser] = {
     request.queryString.get(OAuth2Constants.Error).flatMap(_.headOption).map( error => {
       error match {
         case OAuth2Constants.AccessDenied => throw new AccessDeniedException()
         case _ =>
-          Logger.error("[securesocial] error '%s' returned by the authorization server. Provider type is %s".format(error, id))
+          logger.error("[securesocial] error '%s' returned by the authorization server. Provider type is %s".format(error, id))
           throw new AuthenticationException()
       }
       throw new AuthenticationException()
@@ -137,9 +138,7 @@ abstract class OAuth2Provider(application: Application, jsonResponse: Boolean = 
           )
           SocialUser(IdentityId("", id), "", "", "", None, None, authMethod, oAuth2Info = oauth2Info)
         }
-        if ( Logger.isDebugEnabled ) {
-          Logger.debug("[securesocial] user = " + user)
-        }
+        logger.debug("[securesocial] user = " + user)
         user match  {
           case Some(u) => Right(u)
           case _ => throw new AuthenticationException()
@@ -148,7 +147,7 @@ abstract class OAuth2Provider(application: Application, jsonResponse: Boolean = 
         // There's no code in the request, this is the first step in the oauth flow
         val state = UUID.randomUUID().toString
         val sessionId = request.session.get(IdentityProvider.SessionId).getOrElse(UUID.randomUUID().toString)
-        Cache.set(sessionId, state)
+        Cache.set(sessionId, state, 300)
         var params = List(
           (OAuth2Constants.ClientId, settings.clientId),
           (OAuth2Constants.RedirectUri, RoutesHelper.authenticate(id).absoluteURL(IdentityProvider.sslEnabled)),
@@ -158,10 +157,9 @@ abstract class OAuth2Provider(application: Application, jsonResponse: Boolean = 
         settings.authorizationUrlParams.foreach( e => { params = e :: params })
         val url = settings.authorizationUrl +
           params.map( p => URLEncoder.encode(p._1, "UTF-8") + "=" + URLEncoder.encode(p._2, "UTF-8")).mkString("?", "&", "")
-        if ( Logger.isDebugEnabled ) {
-          Logger.debug("[securesocial] authorizationUrl = %s".format(settings.authorizationUrl))
-          Logger.debug("[securesocial] redirecting to: [%s]".format(url))
-        }
+        logger.debug("[securesocial] authorizationUrl = %s".format(settings.authorizationUrl))
+        logger.debug("[securesocial] redirecting to: [%s]".format(url))
+
         Left(Results.Redirect( url ).withSession(request.session + (IdentityProvider.SessionId, sessionId)))
     }
   }

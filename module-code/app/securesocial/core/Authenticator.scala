@@ -1,5 +1,5 @@
 /**
- * Copyright 2013 Jorge Aliss (jaliss at gmail dot com) - twitter: @jaliss
+ * Copyright 2013-2014 Jorge Aliss (jaliss at gmail dot com) - twitter: @jaliss
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -155,7 +155,7 @@ abstract class AuthenticatorStore(app: Application) extends Plugin {
  */
 class DefaultAuthenticatorStore(app: Application) extends AuthenticatorStore(app) {
   def save(authenticator: Authenticator): Either[Error, Unit] = {
-    Cache.set(authenticator.id,authenticator)
+    Cache.set(authenticator.id,authenticator, Authenticator.absoluteTimeoutInSeconds)
     Right(())
   }
   def find(id: String): Either[Error, Option[Authenticator]] = {

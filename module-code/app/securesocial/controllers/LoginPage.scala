@@ -1,5 +1,5 @@
 /**
- * Copyright 2012 Jorge Aliss (jaliss at gmail dot com) - twitter: @jaliss
+ * Copyright 2012-2014 Jorge Aliss (jaliss at gmail dot com) - twitter: @jaliss
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,13 +16,12 @@
  */
 package securesocial.controllers
 
-import play.api.mvc.{Session, DiscardingCookie, Action, Controller}
+import play.api.mvc.{Action, Controller}
 import securesocial.core._
 import play.api.Play
 import Play.current
 import providers.UsernamePasswordProvider
 import providers.utils.RoutesHelper
-import play.Logger
 
 
 /**
@@ -30,6 +29,8 @@ import play.Logger
  */
 object LoginPage extends Controller
 {
+  private val logger = play.api.Logger("securesocial.controllers.LoginPage")
+
   /**
    * The property that specifies the page the user is redirected to after logging out.
    */
@@ -43,17 +44,15 @@ object LoginPage extends Controller
     val to = ProviderController.landingUrl
     if ( SecureSocial.currentUser.isDefined ) {
       // if the user is already logged in just redirect to the app
-      if ( Logger.isDebugEnabled() ) {
-        Logger.debug("User already logged in, skipping login page. Redirecting to %s".format(to))
-      }
+      logger.debug("User already logged in, skipping login page. Redirecting to %s".format(to))
       Redirect( to )
     } else {
       import com.typesafe.plugin._
       if ( SecureSocial.enableRefererAsOriginalUrl ) {
-        SecureSocial.withRefererAsOriginalUrl(Ok(use[TemplatesPlugin].getLoginPage(request, UsernamePasswordProvider.loginForm)))
+        SecureSocial.withRefererAsOriginalUrl(Ok(use[TemplatesPlugin].getLoginPage(UsernamePasswordProvider.loginForm)))
       } else {
         import Play.current
-        Ok(use[TemplatesPlugin].getLoginPage(request, UsernamePasswordProvider.loginForm))
+        Ok(use[TemplatesPlugin].getLoginPage(UsernamePasswordProvider.loginForm))
 
       }
     }

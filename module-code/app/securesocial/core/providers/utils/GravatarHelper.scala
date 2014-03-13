@@ -1,5 +1,5 @@
 /**
- * Copyright 2012 Jorge Aliss (jaliss at gmail dot com) - twitter: @jaliss
+ * Copyright 2012-2014 Jorge Aliss (jaliss at gmail dot com) - twitter: @jaliss
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,11 +19,12 @@ package securesocial.core.providers.utils
 import java.security.MessageDigest
 import play.api.libs.ws.WS
 import securesocial.core.providers.UsernamePasswordProvider
-import play.api.Logger
 import concurrent.Await
 import scala.concurrent.duration._
 
 object GravatarHelper {
+  private val logger = play.api.Logger("securesocial.core.providers.utils.GravatarHelper")
+
   val GravatarUrl = "http://www.gravatar.com/avatar/%s?d=404"
   val Md5 = "MD5"
 
@@ -34,11 +35,11 @@ object GravatarHelper {
         val url = GravatarUrl.format(hash)
         val promise = WS.url(url).get()
         try {
-          val result = Await.result(promise, 10 seconds)
+          val result = Await.result(promise, 10.seconds)
           if (result.status == 200) Some(url) else None
         } catch {
           case e: Exception => {
-            Logger.error("[securesocial] error invoking gravatar", e)
+            logger.error("[securesocial] error invoking gravatar", e)
             None
           }
         }

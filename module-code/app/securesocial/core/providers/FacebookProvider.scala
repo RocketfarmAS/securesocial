@@ -1,5 +1,5 @@
 /**
- * Copyright 2012 Jorge Aliss (jaliss at gmail dot com) - twitter: @jaliss
+ * Copyright 2012-2014 Jorge Aliss (jaliss at gmail dot com) - twitter: @jaliss
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -70,13 +70,13 @@ class FacebookProvider(application: Application) extends OAuth2Provider(applicat
           )
           throw new AuthenticationException()
         case _ =>
-          val userId = ( me \ Id).as[String]
-          val name = ( me \ Name).as[String]
-          val firstName = ( me \ FirstName).as[String]
-          val lastName = ( me \ LastName).as[String]
-          val picture = (me \ Picture)
+          val userId = (me \ Id).as[String]
+          val name = (me \ Name).as[String]
+          val firstName = (me \ FirstName).as[String]
+          val lastName = (me \ LastName).as[String]
+          val picture = me \ Picture
           val avatarUrl = (picture \ Data \ Url).asOpt[String]
-          val email = ( me \ Email).as[String]
+          val email = (me \ Email).asOpt[String]
 
           user.copy(
             identityId = IdentityId(userId, id),
@@ -84,7 +84,7 @@ class FacebookProvider(application: Application) extends OAuth2Provider(applicat
             lastName = lastName,
             fullName = name,
             avatarUrl = avatarUrl,
-            email = Some(email)
+            email = email
           )
       }
     } catch {

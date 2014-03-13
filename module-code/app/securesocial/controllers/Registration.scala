@@ -1,5 +1,5 @@
 /**
- * Copyright 2012 Jorge Aliss (jaliss at gmail dot com) - twitter: @jaliss
+ * Copyright 2012-2014 Jorge Aliss (jaliss at gmail dot com) - twitter: @jaliss
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,11 +17,11 @@
 package securesocial.controllers
 
 import _root_.java.util.UUID
-import play.api.mvc.{Result, Action, Controller}
+import play.api.mvc.{RequestHeader, Result, Action, Controller}
 import play.api.data._
 import play.api.data.Forms._
 import play.api.data.validation.Constraints._
-import play.api.{Play, Logger}
+import play.api.Play
 import securesocial.core.providers.UsernamePasswordProvider
 import securesocial.core._
 import com.typesafe.plugin._
@@ -32,6 +32,7 @@ import play.api.i18n.Messages
 import securesocial.core.providers.Token
 import scala.Some
 import securesocial.core.IdentityId
+import scala.language.reflectiveCalls
 
 
 /**
@@ -39,6 +40,7 @@ import securesocial.core.IdentityId
  *
  */
 object Registration extends Controller {
+  private val logger = play.api.Logger("securesocial.controllers.Registration")
 
   val providerId = UsernamePasswordProvider.UsernamePassword
   val UserNameAlreadyTaken = "securesocial.signup.userNameAlreadyTaken"
@@ -60,7 +62,7 @@ object Registration extends Controller {
   val Error = "error"
 
   val TokenDurationKey = "securesocial.userpass.tokenDuration"
-  val RegistrationDisabled = "securesocial.registrationDisabled"
+  val RegistrationEnabled = "securesocial.registrationEnabled"
   val DefaultDuration = 60
   val TokenDuration = Play.current.configuration.getInt(TokenDurationKey).getOrElse(DefaultDuration)
 
@@ -68,12 +70,13 @@ object Registration extends Controller {
   val onHandleStartSignUpGoTo = stringConfig("securesocial.onStartSignUpGoTo", RoutesHelper.login().url)
   /** The redirect target of the handleSignUp action. */
   val onHandleSignUpGoTo = stringConfig("securesocial.onSignUpGoTo", RoutesHelper.login().url)
+  val onHandleSignUpGoToOpt = Play.current.configuration.getString("securesocial.onSignUpGoTo")
   /** The redirect target of the handleStartResetPassword action. */
   val onHandleStartResetPasswordGoTo = stringConfig("securesocial.onStartResetPasswordGoTo", RoutesHelper.login().url)
   /** The redirect target of the handleResetPassword action. */
   val onHandleResetPasswordGoTo = stringConfig("securesocial.onResetPasswordGoTo", RoutesHelper.login().url)
 
-  lazy val registrationDisabled = current.configuration.getBoolean(RegistrationDisabled).getOrElse(false)
+  lazy val registrationEnabled = current.configuration.getBoolean(RegistrationEnabled).getOrElse(true)
 
   private def stringConfig(key: String, default: => String) = {
     Play.current.configuration.getString(key).getOrElse(default)
@@ -88,14 +91,11 @@ object Registration extends Controller {
       }),
       FirstName -> nonEmptyText,
       LastName -> nonEmptyText,
-      (Password ->
+      Password ->
         tuple(
-          Password1 -> nonEmptyText.verifying( use[PasswordValidator].errorMessage,
-                                               p => use[PasswordValidator].isValid(p)
-                                             ),
+          Password1 -> nonEmptyText.verifying(PasswordValidator.constraint),
           Password2 -> nonEmptyText
         ).verifying(Messages(PasswordsDoNotMatch), passwords => passwords._1 == passwords._2)
-      )
     )
     // binding
     ((userName, firstName, lastName, password) => RegistrationInfo(Some(userName), firstName, lastName, password._1))
@@ -107,14 +107,11 @@ object Registration extends Controller {
     mapping(
       FirstName -> nonEmptyText,
       LastName -> nonEmptyText,
-      (Password ->
+      Password ->
         tuple(
-          Password1 -> nonEmptyText.verifying( use[PasswordValidator].errorMessage,
-                                               p => use[PasswordValidator].isValid(p)
-                                             ),
+          Password1 -> nonEmptyText.verifying( PasswordValidator.constraint ),
           Password2 -> nonEmptyText
         ).verifying(Messages(PasswordsDoNotMatch), passwords => passwords._1 == passwords._2)
-      )
     )
       // binding
       ((firstName, lastName, password) => RegistrationInfo(None, firstName, lastName, password._1))
@@ -131,9 +128,7 @@ object Registration extends Controller {
   val changePasswordForm = Form (
     Password ->
       tuple(
-        Password1 -> nonEmptyText.verifying( use[PasswordValidator].errorMessage,
-          p => use[PasswordValidator].isValid(p)
-        ),
+        Password1 -> nonEmptyText.verifying( PasswordValidator.constraint ),
         Password2 -> nonEmptyText
       ).verifying(Messages(PasswordsDoNotMatch), passwords => passwords._1 == passwords._2)
   )
@@ -142,14 +137,14 @@ object Registration extends Controller {
    * Starts the sign up process
    */
   def startSignUp = Action { implicit request =>
-    if (registrationDisabled) NotFound(views.html.defaultpages.notFound.render(request, None))
-    else {
+    if (registrationEnabled) {
       if ( SecureSocial.enableRefererAsOriginalUrl ) {
-        SecureSocial.withRefererAsOriginalUrl(Ok(use[TemplatesPlugin].getStartSignUpPage(request, startForm)))
+        SecureSocial.withRefererAsOriginalUrl(Ok(use[TemplatesPlugin].getStartSignUpPage(startForm)))
       } else {
-        Ok(use[TemplatesPlugin].getStartSignUpPage(request, startForm))
+        Ok(use[TemplatesPlugin].getStartSignUpPage(startForm))
       }
     }
+    else NotFound(views.html.defaultpages.notFound.render(request, None))
   }
 
   private def createToken(email: String, isSignUp: Boolean): (String, Token) = {
@@ -167,11 +162,10 @@ object Registration extends Controller {
   }
 
   def handleStartSignUp = Action { implicit request =>
-    if (registrationDisabled) NotFound(views.html.defaultpages.notFound.render(request, None))
-    else {
+    if (registrationEnabled) {
       startForm.bindFromRequest.fold (
         errors => {
-          BadRequest(use[TemplatesPlugin].getStartSignUpPage(request , errors))
+          BadRequest(use[TemplatesPlugin].getStartSignUpPage(errors))
         },
         email => {
           // check if there is already an account for this email address
@@ -189,6 +183,7 @@ object Registration extends Controller {
         }
       )
     }
+    else NotFound(views.html.defaultpages.notFound.render(request, None))
   }
 
   /**
@@ -196,18 +191,16 @@ object Registration extends Controller {
    * @return
    */
   def signUp(token: String) = Action { implicit request =>
-    if (registrationDisabled) NotFound(views.html.defaultpages.notFound.render(request, None))
-    else {
-      if ( Logger.isDebugEnabled ) {
-        Logger.debug("[securesocial] trying sign up with token %s".format(token))
-      }
+    if (registrationEnabled) {
+      logger.debug("[securesocial] trying sign up with token %s".format(token))
       executeForToken(token, true, { _ =>
-        Ok(use[TemplatesPlugin].getSignUpPage(request, form, token))
+        Ok(use[TemplatesPlugin].getSignUpPage(form, token))
       })
     }
+    else NotFound(views.html.defaultpages.notFound.render(request, None))
   }
 
-  private def executeForToken(token: String, isSignUp: Boolean, f: Token => Result): Result = {
+  private def executeForToken(token: String, isSignUp: Boolean, f: Token => Result)(implicit request: RequestHeader): Result = {
     UserService.findToken(token) match {
       case Some(t) if !t.isExpired && t.isSignUp == isSignUp => {
         f(t)
@@ -223,15 +216,12 @@ object Registration extends Controller {
    * Handles posts from the sign up page
    */
   def handleSignUp(token: String) = Action { implicit request =>
-    if (registrationDisabled) NotFound(views.html.defaultpages.notFound.render(request, None))
-    else {
+    if (registrationEnabled) {
       executeForToken(token, true, { t =>
         form.bindFromRequest.fold (
           errors => {
-            if ( Logger.isDebugEnabled ) {
-              Logger.debug("[securesocial] errors " + errors)
-            }
-            BadRequest(use[TemplatesPlugin].getSignUpPage(request, errors, t.uuid))
+            logger.debug("[securesocial] errors " + errors)
+            BadRequest(use[TemplatesPlugin].getSignUpPage(errors, t.uuid))
           },
           info => {
             val id = if ( UsernamePasswordProvider.withUserNameSupport ) info.userName.get else t.email
@@ -253,7 +243,10 @@ object Registration extends Controller {
             }
             val eventSession = Events.fire(new SignUpEvent(user)).getOrElse(session)
             if ( UsernamePasswordProvider.signupSkipLogin ) {
-              ProviderController.completeAuthentication(user, eventSession).flashing(Success -> Messages(SignUpDone))
+              val authResult = ProviderController.completeAuthentication(user, eventSession).flashing(Success -> Messages(SignUpDone))
+              onHandleSignUpGoToOpt.map { targetUrl =>
+                authResult.withHeaders(LOCATION -> targetUrl)
+              } getOrElse authResult
             } else {
               Redirect(onHandleSignUpGoTo).flashing(Success -> Messages(SignUpDone)).withSession(eventSession)
             }
@@ -261,16 +254,17 @@ object Registration extends Controller {
         )
       })
     }
+    else NotFound(views.html.defaultpages.notFound.render(request, None))
   }
 
   def startResetPassword = Action { implicit request =>
-    Ok(use[TemplatesPlugin].getStartResetPasswordPage(request, startForm ))
+    Ok(use[TemplatesPlugin].getStartResetPasswordPage(startForm ))
   }
 
   def handleStartResetPassword = Action { implicit request =>
     startForm.bindFromRequest.fold (
       errors => {
-        BadRequest(use[TemplatesPlugin].getStartResetPasswordPage(request , errors))
+        BadRequest(use[TemplatesPlugin].getStartResetPasswordPage(errors))
       },
       email => {
         UserService.findByEmailAndProvider(email, UsernamePasswordProvider.UsernamePassword) match {
@@ -289,14 +283,14 @@ object Registration extends Controller {
 
   def resetPassword(token: String) = Action { implicit request =>
     executeForToken(token, false, { t =>
-      Ok(use[TemplatesPlugin].getResetPasswordPage(request, changePasswordForm, token))
+      Ok(use[TemplatesPlugin].getResetPasswordPage(changePasswordForm, token))
     })
   }
 
   def handleResetPassword(token: String) = Action { implicit request =>
     executeForToken(token, false, { t=>
       changePasswordForm.bindFromRequest.fold( errors => {
-        BadRequest(use[TemplatesPlugin].getResetPasswordPage(request, errors, token))
+        BadRequest(use[TemplatesPlugin].getResetPasswordPage(errors, token))
       },
       p => {
         val (toFlash, eventSession) = UserService.findByEmailAndProvider(t.email, UsernamePasswordProvider.UsernamePassword) match {
@@ -305,16 +299,16 @@ object Registration extends Controller {
             val updated = UserService.save( SocialUser(user).copy(passwordInfo = Some(hashed)) )
             UserService.deleteToken(token)
             Mailer.sendPasswordChangedNotice(updated)
-            val eventSession = Events.fire(new PasswordResetEvent(user))
-            ( (Success -> Messages(PasswordUpdated)), eventSession)
+            val eventSession = Events.fire(new PasswordResetEvent(updated))
+            ( Success -> Messages(PasswordUpdated), eventSession)
           }
           case _ => {
-            Logger.error("[securesocial] could not find user with email %s during password reset".format(t.email))
-            ( (Error -> Messages(ErrorUpdatingPassword)), None)
+            logger.error("[securesocial] could not find user with email %s during password reset".format(t.email))
+            ( Error -> Messages(ErrorUpdatingPassword), None)
           }
         }
         val result = Redirect(onHandleResetPasswordGoTo).flashing(toFlash)
-        eventSession.map( result.withSession(_) ).getOrElse(result)
+        eventSession.map( result.withSession ).getOrElse(result)
       })
     })
   }

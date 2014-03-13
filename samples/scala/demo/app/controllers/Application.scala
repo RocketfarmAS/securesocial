@@ -17,16 +17,21 @@
 package controllers
 
 import play.api.mvc._
-import securesocial.core.{Identity, Authorization}
+import securesocial.core.{IdentityId, UserService, Identity, Authorization}
+import play.api.{Logger, Play}
+import service.InMemoryUserService
 
 object Application extends Controller with securesocial.core.SecureSocial {
-
+  val logger = Logger("application.controllers.Application")
   def index = SecuredAction { implicit request =>
+    logger.warn("logging from application")
     Ok(views.html.index(request.user))
   }
 
   // a sample action using the new authorization hook
   def onlyTwitter = SecuredAction(WithProvider("twitter")) { implicit request =>
+    val logger = Logger("application.controllers.Application.onlyTwitter")
+    logger.error("only twitter")
 //
 //    Note: If you had a User class and returned an instance of it from UserService, this
 //          is how you would convert Identity to your own class:
@@ -36,6 +41,16 @@ object Application extends Controller with securesocial.core.SecureSocial {
 //      case _ => // did not get a User instance, should not happen,log error/thow exception
 //    }
     Ok("You can see this because you logged in using Twitter")
+  }
+
+  def linkResult = SecuredAction { implicit request =>
+    import com.typesafe.plugin._
+    import play.api.Play.current
+    val identities = use[InMemoryUserService].users.values.map {
+      case user if user.identities.exists(_.identityId == request.user.identityId) => user.identities
+      case user => List()
+    }.flatten
+    Ok(views.html.linkResult(request.user, identities))
   }
 }
 

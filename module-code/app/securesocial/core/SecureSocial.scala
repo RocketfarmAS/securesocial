@@ -1,5 +1,5 @@
 /**
- * Copyright 2012 Jorge Aliss (jaliss at gmail dot com) - twitter: @jaliss
+ * Copyright 2012-2014 Jorge Aliss (jaliss at gmail dot com) - twitter: @jaliss
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ package securesocial.core
 import play.api.mvc._
 import providers.utils.RoutesHelper
 import play.api.i18n.Messages
-import play.api.Logger
 import play.api.libs.json.Json
 import play.api.http.HeaderNames
 import scala.concurrent.Future
@@ -104,6 +103,8 @@ trait SecureSocial extends Controller {
   class SecuredActionBuilder[A](ajaxCall: Boolean = false, authorize: Option[Authorization] = None)
     extends ActionBuilder[({ type R[A] = SecuredRequest[A] })#R] {
 
+    private val logger = play.api.Logger("securesocial.core.SecuredActionBuilder")
+
     def invokeSecuredBlock[A](ajaxCall: Boolean, authorize: Option[Authorization], request: Request[A],
                               block: SecuredRequest[A] => Future[SimpleResult]): Future[SimpleResult] =
     {
@@ -127,9 +128,7 @@ trait SecureSocial extends Controller {
       }
 
       result.getOrElse({
-        if ( Logger.isDebugEnabled ) {
-          Logger.debug("[securesocial] anonymous user trying to access : '%s'".format(request.uri))
-        }
+        logger.debug("[securesocial] anonymous user trying to access : '%s'".format(request.uri))
         val response = if ( ajaxCall ) {
           ajaxCallNotAuthenticated(request)
         } else {
@@ -205,11 +204,15 @@ object SecureSocial {
    * @return
    */
   def currentUser[A](implicit request: RequestHeader):Option[Identity] = {
-    for (
-      authenticator <- authenticatorFromRequest ;
-      user <- UserService.find(authenticator.identityId)
-    ) yield {
-      user
+    request match {
+      case securedRequest: SecuredRequest[_] => Some(securedRequest.user)
+      case userAware: RequestWithUser[_] => userAware.user
+      case _ => for (
+            authenticator <- authenticatorFromRequest ;
+            user <- UserService.find(authenticator.identityId)
+          ) yield {
+            user
+          }
     }
   }
 

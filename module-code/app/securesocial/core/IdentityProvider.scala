@@ -1,5 +1,5 @@
 /**
- * Copyright 2012 Jorge Aliss (jaliss at gmail dot com) - twitter: @jaliss
+ * Copyright 2012-2014 Jorge Aliss (jaliss at gmail dot com) - twitter: @jaliss
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,8 +17,8 @@
 package securesocial.core
 
 import providers.utils.RoutesHelper
-import play.api.mvc.{Request, Result}
-import play.api.{Play, Application, Logger, Plugin}
+import play.api.mvc.{SimpleResult, AnyContent, Request}
+import play.api.{Play, Application, Plugin}
 import concurrent.{Await, Future}
 import play.api.libs.ws.Response
 
@@ -29,6 +29,8 @@ import play.api.libs.ws.Response
  *
  */
 abstract class IdentityProvider(application: Application) extends Plugin with Registrable {
+  private val logger = IdentityProvider.logger
+
   val SecureSocialKey = "securesocial."
   val Dot = "."
 
@@ -37,7 +39,7 @@ abstract class IdentityProvider(application: Application) extends Plugin with Re
    * Registers the provider in the Provider Registry
    */
   override def onStart() {
-    Logger.info("[securesocial] loaded identity provider: %s".format(id))
+    logger.info("[securesocial] loaded identity provider: %s".format(id))
     Registry.providers.register(this)
   }
 
@@ -45,7 +47,7 @@ abstract class IdentityProvider(application: Application) extends Plugin with Re
    * Unregisters the provider
    */
   override def onStop() {
-    Logger.info("[securesocial] unloaded identity provider: %s".format(id))
+    logger.info("[securesocial] unloaded identity provider: %s".format(id))
     Registry.providers.unRegister(id)
   }
 
@@ -68,18 +70,12 @@ abstract class IdentityProvider(application: Application) extends Plugin with Re
    * where the user needs to be redirected to the service provider)
    *
    * @param request
-   * @tparam A
    * @return
    */
-  def authenticate[A]()(implicit request: Request[A]):Either[Result, Identity] = {
+  def authenticate()(implicit request: Request[AnyContent]):Either[SimpleResult, Identity] = {
     doAuth().fold(
       result => Left(result),
-      u =>
-      {
-        val user = fillProfile(u)
-        val saved = UserService.save(user)
-        Right(saved)
-      }
+      u => Right(fillProfile(u))
     )
   }
 
@@ -88,7 +84,8 @@ abstract class IdentityProvider(application: Application) extends Plugin with Re
    * to the provider url.
    * @return
    */
-  def authenticationUrl:String = RoutesHelper.authenticate(id).url
+  def authenticationUrl: String = RoutesHelper.authenticate(id).url
+  def authenticationUrl(redirectTo: String): String = RoutesHelper.authenticate(id, Some(redirectTo)).url
 
   /**
    * The property key used for all the provider properties.
@@ -105,7 +102,7 @@ abstract class IdentityProvider(application: Application) extends Plugin with Re
   def loadProperty(property: String): Option[String] = {
     val result = application.configuration.getString(propertyKey + property)
     if ( !result.isDefined ) {
-      Logger.error("[securesocial] Missing property " + property + " for provider " + id)
+      logger.error("[securesocial] Missing property " + property + " for provider " + id)
     }
     result
   }
@@ -116,10 +113,9 @@ abstract class IdentityProvider(application: Application) extends Plugin with Re
    * a User object that then gets passed to the fillProfile method
    *
    * @param request
-   * @tparam A
    * @return Either a Result or a User
    */
-  def doAuth[A]()(implicit request: Request[A]):Either[Result, SocialUser]
+  def doAuth()(implicit request: Request[AnyContent]):Either[SimpleResult, SocialUser]
 
   /**
    * Subclasses need to implement this method to populate the User object with profile
@@ -132,7 +128,7 @@ abstract class IdentityProvider(application: Application) extends Plugin with Re
 
   protected def throwMissingPropertiesException() {
     val msg = "[securesocial] Missing properties for provider '%s'. Verify your configuration file is properly set.".format(id)
-    Logger.error(msg)
+    logger.error(msg)
     throw new RuntimeException(msg)
   }
 
@@ -142,13 +138,14 @@ abstract class IdentityProvider(application: Application) extends Plugin with Re
 }
 
 object IdentityProvider {
+  private val logger = play.api.Logger("securesocial.core.IdentityProvider")
   val SessionId = "sid"
 
   val sslEnabled: Boolean = {
     import Play.current
     val result = current.configuration.getBoolean("securesocial.ssl").getOrElse(false)
     if ( !result && Play.isProd ) {
-      Logger.warn(
+      logger.warn(
         "[securesocial] IMPORTANT: Play is running in production mode but you did not turn SSL on for SecureSocial." +
           "Not using SSL can make it really easy for an attacker to steal your users' credentials and/or the " +
           "authenticator cookie and gain access to the system."
@@ -159,6 +156,6 @@ object IdentityProvider {
 
   val secondsToWait = {
     import scala.concurrent.duration._
-    10 seconds
+    10.seconds
   }
 }

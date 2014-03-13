@@ -1,3 +1,51 @@
+master  -
+		- removed unnecessary fix for http context in SecuredAction (Java): Play sets the http context properly now.
+		- Fixed handling of IDs greater than 32bits for TwitterProvider
+		- Prevent errors caused by missing email in FacebookProvider (thanks @chrisbeach)
+		- Handle onSignUpGoTo configuration when signupSkipLogin is enabled (thanks @paiou)
+		- LinkedInOAuth2Provider: retrieve email address and add sample configuration (thanks @paiou)
+		- Improve logging behaviour (thanks @jeantil)
+		- Add test helpers for unit and integration testing of securesocial controllers (thanks @jeantil)
+		- Added Finnish translation (thanks @hannikkala)
+		- Fixed error in Hebrew message file: was utf-8, now utf-8 without bom (thanks @katrinsharp)
+		- Added Swedish translation (thanks @ricn)
+		- Added Japanese translation (thanks @orih)
+		- /authenticate/:provider routes can now receive a 'redirectTo' parameter. This is where the user is redirected
+                  after succesful authentication (if used overrides the url set in OriginalUrl by SecuredAction)
+		- ProviderController.authenticate signature changed. Breaks compatibility: routes file needs to be adjusted (see sample apps)
+		- Added support for linking accounts. New 'link' method in UserService needs to be implemented.
+		- Update messages.fr for single quotes (thanks @fmasion)
+		- Small fixes for NL messages (thanks @francisdb)
+		- Added German translation (thanks @l0rdn1kk0n)
+		- Added Arabic translation (thanks @Ahimta)
+		- Added Brazilian Portuguese translation (thanks @jeohalves)
+		- Added Polish translation (thanks Dominik Sienkiewicz)
+		- Added Spanish translation (thanks @jorgeolmos)
+		- Added Hungarian translation (thanks @bubbanat)
+		- Added French translation (thanks @afigoureux)
+		- Added Serbian translation (thanks @vitalije)
+		- Added Hebrew translation (thanks @katrinsharp)
+		- Added Persian translation (thanks @AmirKarimi)
+		- Fixed i18n issues: API breaking changes in TemplatesPlugin, PasswordValidator and templates (they need an implicit Lang as parameter now). Part of the i18n fixes are based on the pull request by @fernandoacorreia, thanks!
+		- Removed duplicate entry in Russian locale
+		- Added Russian locale (thanks @siman)
+		- Add ability to set extra params to oauth2 url endpoints (thanks @chazmcgarvey and @nascosto)
+		- Updated docs for maven and fixed a rendering problem in the password change page.
+		- Starting 2.1.3 the module is published to Maven Central
+2.1.3	- 2014-01-23
+		- Change registrationDisabled to registrationEnabled (thanks @hugogoncalves)
+		- Hide sign up link when Registration provider is disabled (thanks @hugogoncalves)
+		- Fixed: ProviderController.toUrl was not using the session returned by the event handler
+		- Added onPasswordChangeGoTo option (thanks @fernandoacorreia)
+		- Disabled Registration feature (thanks @c-schmitt)
+		- Fixed: PasswordResetEvent does not have updated password
+		- Fixed typos in readme and docs (thanks @fayimora, @fernandoacorreia, @nelsonblaha)
+		- Minor doc updates (thanks @dnephin)
+		- Added traditional Chinese message file (thanks @yuchuan1)
+		- Fixed password change with multiple hashers (thanks @FabienPennequin)
+		- Fixed compiler warnings
+		- Improved SecureSocial.currentUser to avoid the UserService.find call if the request has the user already
+		- Added expiration to Cache.set calls
 2.1.2	- 2013-11-01
 		- Fixed example for view customization docs (thanks @yankov)
 		- Enable retrieving email address from LinkedIn (thanks @targeter)

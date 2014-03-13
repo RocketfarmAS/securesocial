@@ -1,5 +1,5 @@
 /**
- * Copyright 2013 Jorge Aliss (jaliss at gmail dot com) - twitter: @jaliss
+ * Copyright 2013-2014 Jorge Aliss (jaliss at gmail dot com) - twitter: @jaliss
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,8 @@
  */
 package securesocial.core
 
-import play.api.mvc.{Session, RequestHeader}
-import play.api.{Logger, Plugin}
+import play.api.mvc.{Controller, Session, RequestHeader}
+import play.api.Plugin
 
 /**
  * A trait to model SecureSocial events
@@ -57,15 +57,17 @@ case class PasswordResetEvent(user: Identity) extends Event
 /**
  * The event listener interface
  */
-abstract class EventListener extends Plugin with Registrable {
+abstract class EventListener extends Plugin with Registrable with Controller {
+  private val logger = play.api.Logger("securesocial.core.EventListener")
+
   override def onStart() {
-    Logger.info("[securesocial] loaded event listener %s".format(id))
+    logger.info("[securesocial] loaded event listener %s".format(id))
     Registry.eventListeners.register(this)
   }
 
 
   override def onStop() {
-    Logger.info("[securesocial] unloaded event listener %s".format(id))
+    logger.info("[securesocial] unloaded event listener %s".format(id))
     Registry.eventListeners.unRegister(id)
   }
   /**

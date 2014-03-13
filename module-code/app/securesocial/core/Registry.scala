@@ -1,5 +1,5 @@
 /**
- * Copyright 2012 Jorge Aliss (jaliss at gmail dot com) - twitter: @jaliss
+ * Copyright 2012-2014 Jorge Aliss (jaliss at gmail dot com) - twitter: @jaliss
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
  */
 package securesocial.core
 
-import play.api.Logger
 import providers.UsernamePasswordProvider
 import providers.utils.PasswordHasher
 import scala.None
@@ -27,6 +26,8 @@ trait Registrable {
 }
 
 class PluginRegistry[T <: Registrable](label: String) {
+  private val logger = play.api.Logger("securesocial.core.PluginRegistry")
+
   private var registry = Map[String, T]()
 
   def register(plugin: T) {
@@ -43,7 +44,7 @@ class PluginRegistry[T <: Registrable](label: String) {
   }
 
   def get(id: String): Option[T] = registry.get(id) orElse {
-    Logger.error("[securesocial] can't find %s for id %s".format(label, id))
+    logger.error("[securesocial] can't find %s for id %s".format(label, id))
     None
   }
 

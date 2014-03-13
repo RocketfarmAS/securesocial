@@ -1,5 +1,5 @@
 /**
- * Copyright 2012 Jorge Aliss (jaliss at gmail dot com) - twitter: @jaliss
+ * Copyright 2012-2014 Jorge Aliss (jaliss at gmail dot com) - twitter: @jaliss
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
  */
 package securesocial.core
 
-import play.api.{Logger, Plugin, Application}
+import play.api.{Plugin, Application}
 import providers.{UsernamePasswordProvider, Token}
 import play.api.libs.concurrent.Akka
 import akka.actor.Cancellable
@@ -57,6 +57,14 @@ trait UserService {
   def save(user: Identity): Identity
 
   /**
+   * Links the current user Identity to another
+   *
+   * @param current The Identity of the current user
+   * @param to The Identity that needs to be linked to the current user
+   */
+  def link(current: Identity, to: Identity)
+
+  /**
    * Saves a token.  This is needed for users that
    * are creating an account in the system instead of using one in a 3rd party system.
    *
@@ -64,7 +72,6 @@ trait UserService {
    * implementation
    *
    * @param token The token to save
-   * @return A string with a uuid that will be embedded in the welcome email.
    */
   def save(token: Token)
 
@@ -107,6 +114,8 @@ trait UserService {
  * @param application
  */
 abstract class UserServicePlugin(application: Application) extends Plugin with UserService {
+  private val logger = play.api.Logger("securesocial.core.UserServicePlugin")
+
   val DefaultInterval = 5
   val DeleteIntervalKey = "securesocial.userpass.tokenDeleteInterval"
 
@@ -127,17 +136,15 @@ abstract class UserServicePlugin(application: Application) extends Plugin with U
 
     cancellable = if ( UsernamePasswordProvider.enableTokenJob ) {
       Some(
-        Akka.system.scheduler.schedule(0 seconds, i minutes) {
-          if ( Logger.isDebugEnabled ) {
-            Logger.debug("[securesocial] calling deleteExpiredTokens()")
-          }
+        Akka.system.scheduler.schedule(0.seconds, i.minutes) {
+          logger.debug("[securesocial] calling deleteExpiredTokens()")
           deleteExpiredTokens()
         }
       )
     } else None
 
     UserService.setService(this)
-    Logger.info("[securesocial] loaded user service: %s".format(this.getClass))
+    logger.info("[securesocial] loaded user service: %s".format(this.getClass))
   }
 }
 
@@ -145,6 +152,8 @@ abstract class UserServicePlugin(application: Application) extends Plugin with U
  * The UserService singleton
  */
 object UserService {
+  private val logger = play.api.Logger("securesocial.core.UserService")
+
   var delegate: Option[UserService] = None
 
   def setService(service: UserService) {
@@ -172,6 +181,12 @@ object UserService {
     }
   }
 
+  def link(current: Identity, to: Identity)  {
+    delegate.map( _.link(current, to) ).getOrElse {
+      notInitialized()
+    }
+  }
+
   def save(token: Token) {
     delegate.map( _.save(token) ).getOrElse {
       notInitialized()
@@ -193,7 +208,7 @@ object UserService {
 
 
   private def notInitialized() {
-    Logger.error("[securesocial] UserService was not initialized. Make sure a UserService plugin is specified in your play.plugins file")
+    logger.error("[securesocial] UserService was not initialized. Make sure a UserService plugin is specified in your play.plugins file")
     throw new RuntimeException("UserService not initialized")
   }
 }

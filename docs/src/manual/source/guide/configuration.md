@@ -110,7 +110,7 @@ All the settings go inside a `securesocial` section as shown below:
 
 The configuration for each provider needs to be added within the `securesocial` section as well. 
 
-### Username Passsword Provider
+### Username Password Provider
 
 The following properties can be configured:
 
@@ -227,6 +227,34 @@ To get the `clientId`/`clientSecret` or `consumerKey`/`consumerSecret` keys you 
 
 *Hint: you can use the `securesocial.conf` file in the sample apps as a starting point.*
 
+### OAuth 2 Providers extra configuration
+
+Some OAuth 2 providers (e.g. Google) allow using use extra request parameters with their endpoints in order to alter the flow in various ways.  You can use the following properties to add those parameters:
+
+- `authorizationUrlParams`: parameters added when invoking authorization url
+
+- `accessTokenUrlParams`: parameters added when invoking the access token url
+
+A sample usage would look like:
+
+    :::bash
+    google {
+        authorizationUrl="https://accounts.google.com/o/oauth2/auth"
+        ...
+        authorizationUrlParams {
+            access_type=offline
+        }
+    }
+
 ## Clustered environments
 
 SecureSocial uses the Play cache to store values while signing in users via OAuth.  If you have more than one server then make sure to use a distributed cache (eg: memcached).
+
+## Logging configuration
+
+All the securesocial loggers are defined using Play's logging API under the "securesocial" root logger. If you want to customize the logging level for a securesocial component all you have to do is add a line for it in you application.conf.
+For example adding the following line would set all the securesocial loggers at the debug level:
+
+    logger.securesocial=DEBUG
+
+For more information on how to customize logging in Play! you can check the corresponding [documentation](http://www.playframework.com/documentation/2.2.0/SettingsLogger)
