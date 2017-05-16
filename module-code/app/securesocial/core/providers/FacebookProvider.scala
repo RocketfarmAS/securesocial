@@ -20,6 +20,7 @@ import play.api.{Application, Logger}
 import play.api.libs.json.JsObject
 import securesocial.core._
 import play.api.libs.ws.{ Response, WS }
+import play.api.libs.json._
 
 /**
  * A Facebook Provider
@@ -44,7 +45,20 @@ class FacebookProvider(application: Application) extends OAuth2Provider(applicat
 
   // facebook does not follow the OAuth2 spec :-\
   override protected def buildInfo(response: Response): OAuth2Info = {
-    response.body.split("&|=") match {
+    try {
+      buildInfoJson(response.body)
+    } catch {
+      case e: Exception => {
+        buildInfoRaw(response.body)
+      }
+    }
+  }
+  protected def buildInfoJson(body: String): OAuth2Info = {
+    val json: JsValue = Json.parse(body)
+    OAuth2Info((json \ "access_token").as[String], None, (json \ "expires_in").asOpt[Int])
+  }
+  protected def buildInfoRaw(body: String): OAuth2Info = {
+    body.split("&|=") match {
         case Array(AccessToken, token, Expires, expiresIn) => OAuth2Info(token, None, Some(expiresIn.toInt))
         case Array(AccessToken, token) => OAuth2Info(token)
         case _ =>
